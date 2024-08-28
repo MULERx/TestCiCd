@@ -1,0 +1,55 @@
+name: .NET Blazor CI/CD
+
+on:
+  push:
+    branches:
+      - main # or the branch you use for production
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v3
+
+      - name: Setup .NET SDK
+        uses: actions/setup-dotnet@v3
+        with:
+          dotnet-version: '8.x' # Use the version that matches your project
+
+      - name: Restore dependencies
+        run: dotnet restore
+
+      - name: Build
+        run: dotnet build --configuration Release
+
+      - name: Publish
+        run: dotnet publish --configuration Release --output ./publish
+
+  deploy:
+    runs-on: ubuntu-latest
+    needs: build
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v3
+
+      - name: Install Web Deploy
+        run: sudo apt-get install -y zip
+
+      - name: Upload artifact
+        uses: actions/upload-artifact@v3
+        with:
+          name: publish
+          path: ./publish
+
+      - name: Deploy to IIS
+        uses: appleboy/drone-ssh@v1
+        with:
+          host: ${{ secrets.IIS_SERVER_IP }}
+          username: ${{ secrets.IIS_SERVER_USERNAME }}
+          key: ${{ secrets.IIS_SERVER_SSH_KEY }}
+          script: |
+            unzip -o /tmp/publish.zip -d /path/to/deploy/folder
+            cd /path/to/deploy/folder
+            dotnet YourApp.dll
